@@ -373,56 +373,100 @@ export default function CRMDashboard() {
                     </div>
                   </div>
 
-                  {/* Transcripción de la IA */}
-                  <div className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-7 custom-scrollbar scroll-smooth bg-circuit-pattern">
-                    {/* Etiqueta de aviso */}
-                    <div className="flex justify-center mb-8">
-                      <span className="px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-semibold tracking-wider uppercase flex items-center gap-2 shadow-sm">
-                        <ShieldCheck className="w-3.5 h-3.5" /> Transcripción Segura AI
-                      </span>
-                    </div>
+                  {/* Perfil Estratégico del Prospecto */}
+                  <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 custom-scrollbar scroll-smooth bg-[#0d141d]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                    {chatHistory.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4 mt-20">
-                        <div className="animate-pulse opacity-50">
-                          <MessageSquare className="w-16 h-16" />
+                      {/* Tarjeta de Calificación AI */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent blur-2xl rounded-full"></div>
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-blue-400" /> Nivel de Interés (AI Score)
+                        </h3>
+                        <div className="flex items-end gap-3 mb-2">
+                          <span className="text-4xl font-extrabold text-white tracking-tighter">
+                            {selectedLead.status === 'agendado' ? '92' : selectedLead.status === 'en_conversacion' ? '75' : '30'}
+                            <span className="text-lg text-gray-500 font-medium">/100</span>
+                          </span>
                         </div>
-                        <p className="font-medium text-[15px]">Esperando intercambio de datos...</p>
+                        <div className="w-full bg-[#1e293b] rounded-full h-2.5 mb-4">
+                          <div className={`h-2.5 rounded-full ${selectedLead.status === 'agendado' ? 'bg-emerald-500 w-[92%]' : selectedLead.status === 'en_conversacion' ? 'bg-blue-500 w-[75%]' : 'bg-red-500 w-[30%]'}`}></div>
+                        </div>
+                        <p className="text-sm text-gray-400 font-medium leading-relaxed">
+                          {selectedLead.status === 'agendado' ? 'Alta probabilidad de cierre. Cliente requiere atención logística inmediata.' : selectedLead.status === 'en_conversacion' ? 'Prospecto explorando tarifas. Ideal para aplicar incentivo de envío.' : 'Prospecto descartado o frío por el momento.'}
+                        </p>
                       </div>
-                    ) : (
-                      chatHistory.map((msg, idx) => (
-                        <div key={idx} className="space-y-6 max-w-4xl mx-auto">
 
-                          {/* Mensaje Cliente */}
-                          <div className="flex justify-start items-end gap-3 translate-x-4">
-                            <div className="w-8 h-8 rounded-full bg-gray-700 border border-gray-600 flex items-center justify-center shadow-md">
-                              <Users className="w-4 h-4 text-gray-300" />
-                            </div>
-                            <div className="bg-[#1e293b] text-gray-100 p-4.5 rounded-2xl rounded-bl-none shadow-md max-w-[80%] border border-[#2a3a4f]">
-                              <p className="text-[15px] leading-relaxed font-medium">{msg.message_in}</p>
-                              <span className="text-[11px] text-gray-400 mt-2 block font-medium">
-                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                      {/* Extracción de Necesidad */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-amber-400" /> Perfil de Demanda
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
+                            <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase font-bold">Ruta Frecuente Detectada</p>
+                              <p className="text-sm text-gray-200 font-medium">Principalmente Nacional / Evaluar chat</p>
                             </div>
                           </div>
-
-                          {/* Respuesta Sophia */}
-                          {msg.response_out && (
-                            <div className="flex justify-end items-end gap-3 -translate-x-4">
-                              <div className="bg-gradient-to-br from-[#2a111a] to-[#3a1824] text-gray-100 p-4.5 rounded-2xl rounded-br-none shadow-lg max-w-[80%] border border-[#8a1538]/40">
-                                <p className="text-[15px] leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.response_out.replace(/\n/g, '<br/>') }}></p>
-                                <span className="text-[11px] text-[#ff8fb0] mt-3 flex items-center justify-end gap-2 font-bold tracking-wide">
-                                  <Zap className="w-3.5 h-3.5 text-yellow-400" /> Sophia Intelligence
-                                </span>
-                              </div>
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8a1538] to-[#e41a54] flex items-center justify-center shadow-md shadow-[#8a1538]/50 border border-[#ff4d79]/30">
-                                <span className="font-bold text-white text-xs">AI</span>
-                              </div>
+                          <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
+                            <TrendingUp className="w-5 h-5 text-gray-400 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase font-bold">Volumen Estimado</p>
+                              <p className="text-sm text-gray-200 font-medium">
+                                {chatHistory.length > 0 && chatHistory.some(c => c.message_in.toLowerCase().includes('ecommerce') || c.message_in.toLowerCase().includes('tienda')) ? 'Alto (Comercio / Ecommerce)' : 'Bajo / Único'}
+                              </p>
                             </div>
-                          )}
+                          </div>
                         </div>
-                      ))
-                    )}
+                      </div>
+                    </div>
+
+                    {/* Plan de Acción Estratégico */}
+                    <div className="bg-gradient-to-r from-[#8a1538]/10 to-transparent p-6 rounded-2xl border border-[#8a1538]/30 shadow-lg">
+                      <h3 className="text-sm font-bold text-[#ff8fb0] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-[#e41a54]" /> Siguiente Acción Sugerida (AI)
+                      </h3>
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#0d141d]/80 p-4 rounded-xl border border-[#1e293b]">
+                        <p className="text-gray-300 text-sm font-medium">
+                          {selectedLead.status === 'agendado' ? '✅ Enviar enlace de pago/facturación y programar recolección vehicular.' : '⚠️ Enviar tarifario exacto y ofrecer descuento de primera vez para forzar cierre.'}
+                        </p>
+                        <a
+                          href={`https://wa.me/${selectedLead.phone.split('@')[0]}`}
+                          target="_blank" rel="noreferrer"
+                          className="shrink-0 px-4 py-2 bg-white text-black font-bold text-sm rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Ejecutar Acción
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Último Contexto (Mini Chat) */}
+                    <div className="mt-8">
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Última Interacción Relevante</h3>
+                      {chatHistory.length === 0 ? (
+                        <div className="text-center p-8 bg-[#121a24] rounded-xl border border-[#1e293b] text-gray-500 text-sm">No hay transcripción disponible.</div>
+                      ) : (
+                        <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-inner space-y-4 opacity-80 hover:opacity-100 transition-opacity">
+                          {chatHistory.slice(-1).map((msg, idx) => (
+                            <div key={idx} className="space-y-4">
+                              <div className="flex gap-3 items-start">
+                                <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center shrink-0 mt-1"><Users className="w-3 h-3 text-gray-300" /></div>
+                                <div className="bg-[#1e293b] p-3 rounded-xl rounded-tl-none text-sm text-gray-200 border border-[#2a3a4f]">{msg.message_in}</div>
+                              </div>
+                              {msg.response_out && (
+                                <div className="flex gap-3 items-start justify-end">
+                                  <div className="bg-gradient-to-br from-[#2a111a] to-[#3a1824] p-3 rounded-xl rounded-tr-none text-sm text-gray-200 border border-[#8a1538]/40" dangerouslySetInnerHTML={{ __html: msg.response_out }}></div>
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8a1538] to-[#e41a54] flex items-center justify-center shrink-0 mt-1 text-[10px] font-bold text-white">AI</div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </>
               ) : (
