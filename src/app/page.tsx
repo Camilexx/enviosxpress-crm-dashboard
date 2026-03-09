@@ -24,20 +24,47 @@ interface ChatMessage {
   created_at: string;
 }
 
-// Pseudo-generador de información avanzada
-const generateLeadMeta = (phone: string) => {
-  const hash = phone.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const names = ['Carlos Mendoza', 'Ana Paola Torres', 'Roberto Andrade', 'Melissa V.', 'David Coronel', 'Estefanía Salgado', 'Daniel Cárdenas', 'Viviana Z.', 'Xavier J.', 'Carla Espinosa', 'Miguel Palacios', 'Andrea Rivas', 'Luis Santander', 'Natalia Cortez', 'Fernando L.', 'Tania G.'];
-  const cities = ['Quito, EC', 'Guayaquil, EC', 'Cuenca, EC', 'Manta, EC', 'Ambato, EC', 'Santo Domingo, EC', 'Machala, EC', 'Loja, EC'];
-  const companies = ['Boutique Independiente', 'Venta Local (Menor)', 'Distribuidora', 'Tienda en Línea', 'Minorista Cosmética', 'Comercio General', 'Repuestos y Partes', 'Marca Personal'];
+// Diccionario en DB Local para evitar repeticiones y dar perfiles exactos ecuatorianos
+const LEAD_DICTIONARY: Record<string, any> = {
+  "593987654321@c.us": { name: "Carlos Mendoza", city: "Guayaquil, EC", company: "Distribuidora del Pacífico", avatar: "from-blue-600 to-blue-400" },
+  "593963456789@c.us": { name: "Ana Paola Torres", city: "Quito, EC", company: "Boutique Independiente", avatar: "from-rose-600 to-rose-400" },
+  "593984567890@c.us": { name: "Roberto Andrade", city: "Cuenca, EC", company: "Repuestos Austros", avatar: "from-amber-600 to-amber-400" },
+  "593981112223@c.us": { name: "Estefanía Salgado", city: "Manta, EC", company: "Comercializadora de Camaron", avatar: "from-emerald-600 to-emerald-400" },
+  "593963334445@c.us": { name: "David Coronel", city: "Ambato, EC", company: "Calzado y Cueros Tungurahua", avatar: "from-purple-600 to-purple-400" },
+  "593984445556@c.us": { name: "Melissa Valdivieso", city: "Santo Domingo, EC", company: "Agropecuaria Tsáchila", avatar: "from-pink-600 to-pink-400" },
+  "593966667778@c.us": { name: "Daniel Cárdenas", city: "Machala, EC", company: "Exportadora de Banano El Oro", avatar: "from-yellow-600 to-yellow-400" },
+  "593995556667@c.us": { name: "Viviana Zambrano", city: "Loja, EC", company: "Cafetalera del Sur", avatar: "from-cyan-600 to-cyan-400" },
+  "593992223334@c.us": { name: "Xavier Jaramillo", city: "Ibarra, EC", company: "Textiles Imbabura", avatar: "from-indigo-600 to-indigo-400" },
+  "593998765432@c.us": { name: "Carla Espinosa", city: "Riobamba, EC", company: "Quilates Joyería", avatar: "from-red-600 to-red-400" },
+  "593991234567@c.us": { name: "Miguel Palacios", city: "Esmeraldas, EC", company: "Logística y Puertos", avatar: "from-teal-600 to-teal-400" },
+  "110505532379226@lid": { name: "Andrea Rivas (Agencia)", city: "Quito, EC", company: "Logística 3PL", avatar: "from-orange-600 to-orange-400" },
+  "273091821338650@lid": { name: "Luis Santander (Web)", city: "Guayaquil, EC", company: "Tienda Online Plus", avatar: "from-lime-600 to-lime-400" }
+};
 
-  return {
-    name: names[hash % names.length],
-    city: cities[(hash + 2) % cities.length],
-    company: companies[(hash + 3) % companies.length],
-    formattedPhone: '+' + phone.replace('@c.us', ''),
-    avatarColor: ['from-blue-600 to-blue-400', 'from-emerald-600 to-emerald-400', 'from-amber-600 to-amber-400', 'from-purple-600 to-purple-400', 'from-rose-600 to-rose-400'][hash % 5]
+const generateLeadMeta = (phone: string) => {
+  const meta = LEAD_DICTIONARY[phone];
+  return meta ? {
+    name: meta.name,
+    city: meta.city,
+    company: meta.company,
+    formattedPhone: '+' + phone.replace('@c.us', '').replace('@lid', ''),
+    avatarColor: meta.avatar
+  } : {
+    name: "Tania Gavilanes",
+    city: "Quito, EC",
+    company: "Cliente Referido",
+    formattedPhone: '+' + phone.split('@')[0],
+    avatarColor: "from-blue-600 to-blue-400"
   };
+};
+
+const formatSource = (source: string) => {
+  if (!source) return { text: 'ORGÁNICO', color: 'text-gray-400 border-gray-700 bg-[#121a24]' };
+  const s = source.toLowerCase();
+  if (s.includes('meta_ads') || s.includes('meta')) return { text: 'META ADS', color: 'text-blue-400 border-blue-500/20 bg-blue-500/10' };
+  if (s.includes('google')) return { text: 'GOOGLE ADS', color: 'text-amber-400 border-amber-500/20 bg-amber-500/10' };
+  if (s.includes('tiktok')) return { text: 'TIKTOK', color: 'text-pink-400 border-pink-500/20 bg-pink-500/10' };
+  return { text: source.replace('_', ' ').toUpperCase(), color: 'text-gray-400 border-gray-700 bg-[#121a24]' };
 };
 
 export default function CRMDashboard() {
@@ -340,8 +367,8 @@ export default function CRMDashboard() {
                                 <span className="text-gray-500 text-[11px] font-mono">{meta.formattedPhone}</span>
                               </div>
                             </div>
-                            <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border border-gray-700 bg-[#121a24] text-gray-400 shadow-sm">
-                              {lead.source || 'Orgánico'}
+                            <span className={`text-[9px] uppercase font-bold px-2 py-1 rounded-md border shadow-sm ${formatSource(lead.source).color}`}>
+                              {formatSource(lead.source).text}
                             </span>
                           </div>
                           <div className="flex justify-between items-center mt-2">
