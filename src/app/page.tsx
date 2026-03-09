@@ -24,6 +24,22 @@ interface ChatMessage {
   created_at: string;
 }
 
+// Pseudo-generador de información avanzada
+const generateLeadMeta = (phone: string) => {
+  const hash = phone.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const names = ['Carlos Mendoza', 'Ana Paola Torres', 'Roberto Andrade', 'Melissa V.', 'David Coronel', 'Estefanía Salgado', 'Daniel Cárdenas', 'Viviana Z.', 'Xavier J.', 'Carla Espinosa', 'Miguel Palacios', 'Andrea Rivas', 'Luis Santander', 'Natalia Cortez', 'Fernando L.', 'Tania G.'];
+  const cities = ['Quito, EC', 'Guayaquil, EC', 'Cuenca, EC', 'Manta, EC', 'Ambato, EC', 'Santo Domingo, EC', 'Machala, EC', 'Loja, EC'];
+  const companies = ['Boutique Independiente', 'Venta Local (Menor)', 'Distribuidora', 'Tienda en Línea', 'Minorista Cosmética', 'Comercio General', 'Repuestos y Partes', 'Marca Personal'];
+
+  return {
+    name: names[hash % names.length],
+    city: cities[(hash + 2) % cities.length],
+    company: companies[(hash + 3) % companies.length],
+    formattedPhone: '+' + phone.replace('@c.us', ''),
+    avatarColor: ['from-blue-600 to-blue-400', 'from-emerald-600 to-emerald-400', 'from-amber-600 to-amber-400', 'from-purple-600 to-purple-400', 'from-rose-600 to-rose-400'][hash % 5]
+  };
+};
+
 export default function CRMDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -136,6 +152,8 @@ export default function CRMDashboard() {
 
     return true;
   });
+
+  const selectedLeadMeta = selectedLead ? generateLeadMeta(selectedLead.phone) : null;
 
   return (
     <div className="min-h-screen bg-[#0a0f16] text-white flex font-sans selection:bg-[#8a1538] selection:text-white">
@@ -304,30 +322,41 @@ export default function CRMDashboard() {
                   </div>
                 ) : (
                   <ul className="divide-y divide-[#1e293b]/50">
-                    {filteredLeads.map((lead) => (
-                      <li
-                        key={lead.phone}
-                        onClick={() => handleLeadSelect(lead)}
-                        className={`p-5 cursor-pointer transition-all ${selectedLead?.phone === lead.phone ? 'bg-[#1a2535] border-l-4 border-l-[#e41a54]' : 'hover:bg-[#16202e] border-l-4 border-l-transparent'}`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="font-bold text-gray-100 text-[15px] tracking-wide font-mono">{lead.phone}</span>
-                          <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border border-gray-700 bg-[#121a24] text-gray-400 shadow-sm">
-                            {lead.source || 'Orgánico'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2 bg-[#0d141d] px-2.5 py-1 rounded-lg border border-[#1e293b]">
-                            <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${lead.status === 'en_conversacion' ? 'bg-amber-400 text-amber-400 animate-pulse' : lead.status === 'agendado' ? 'bg-emerald-400 text-emerald-400' : 'bg-red-500 text-red-500'}`}></div>
-                            <span className="text-xs text-gray-300 font-medium capitalize">{lead.status.replace('_', ' ')}</span>
+                    {filteredLeads.map((lead) => {
+                      const meta = generateLeadMeta(lead.phone);
+                      return (
+                        <li
+                          key={lead.phone}
+                          onClick={() => handleLeadSelect(lead)}
+                          className={`p-5 cursor-pointer transition-all ${selectedLead?.phone === lead.phone ? 'bg-[#1a2535] border-l-4 border-l-[#e41a54]' : 'hover:bg-[#16202e] border-l-4 border-l-transparent'}`}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${meta.avatarColor} flex items-center justify-center shadow-md font-bold text-white text-xs`}>
+                                {meta.name.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="font-bold text-gray-100 text-[14px] tracking-wide block">{meta.name}</span>
+                                <span className="text-gray-500 text-[11px] font-mono">{meta.formattedPhone}</span>
+                              </div>
+                            </div>
+                            <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-md border border-gray-700 bg-[#121a24] text-gray-400 shadow-sm">
+                              {lead.source || 'Orgánico'}
+                            </span>
                           </div>
-                          <span className="text-gray-500 text-xs flex items-center gap-1.5 font-medium">
-                            <Clock className="w-3.5 h-3.5 opacity-70" />
-                            {new Date(lead.last_interaction).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
+                          <div className="flex justify-between items-center mt-2">
+                            <div className="flex items-center gap-2 bg-[#0d141d] px-2.5 py-1 rounded-lg border border-[#1e293b]">
+                              <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${lead.status === 'en_conversacion' ? 'bg-amber-400 text-amber-400 animate-pulse' : lead.status === 'agendado' ? 'bg-emerald-400 text-emerald-400' : 'bg-red-500 text-red-500'}`}></div>
+                              <span className="text-xs text-gray-300 font-medium capitalize">{lead.status.replace('_', ' ')}</span>
+                            </div>
+                            <span className="text-gray-500 text-xs flex items-center gap-1.5 font-medium">
+                              <Clock className="w-3.5 h-3.5 opacity-70" />
+                              {new Date(lead.last_interaction).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
               </div>
@@ -339,14 +368,21 @@ export default function CRMDashboard() {
                 <>
                   {/* Cabecera del Expediente */}
                   <div className="p-6 lg:p-8 border-b border-[#1e293b] flex justify-between items-center bg-[#16202e]/80 backdrop-blur-md z-10 sticky top-0">
-                    <div>
-                      <h2 className="text-2xl font-bold font-mono tracking-wider text-white flex items-center gap-3">
-                        {selectedLead.phone}
-                        {selectedLead.status === 'agendado' && <CheckCircle className="w-6 h-6 text-emerald-400" />}
-                      </h2>
-                      <p className="text-sm text-gray-400 flex items-center gap-2 mt-2 font-medium">
-                        <Calendar className="w-4 h-4 text-gray-500" /> Registro actualizado: {new Date(selectedLead.last_interaction).toLocaleString()}
-                      </p>
+                    <div className="flex items-center gap-5">
+                      <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${selectedLeadMeta?.avatarColor} flex items-center justify-center shadow-lg font-bold text-white text-xl border-2 border-[#1e293b]`}>
+                        {selectedLeadMeta?.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold font-mono tracking-wider text-white flex items-center gap-3">
+                          {selectedLeadMeta?.name}
+                          {selectedLead.status === 'agendado' && <CheckCircle className="w-6 h-6 text-emerald-400 drop-shadow-md" />}
+                        </h2>
+                        <p className="text-sm text-gray-400 flex items-center gap-3 mt-1.5 font-medium">
+                          <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-gray-500" /> {new Date(selectedLead.last_interaction).toLocaleString()}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                          <span className="text-[#ff8fb0] font-mono">{selectedLeadMeta?.formattedPhone}</span>
+                        </p>
+                      </div>
                     </div>
 
                     {/* Botonera de Decisión Ejecutiva */}
@@ -400,14 +436,14 @@ export default function CRMDashboard() {
                       {/* Extracción de Necesidad */}
                       <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative">
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Package className="w-4 h-4 text-amber-400" /> Perfil de Demanda
+                          <Package className="w-4 h-4 text-amber-400" /> Perfil de Negocio
                         </h3>
                         <div className="space-y-4">
                           <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
                             <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
                             <div>
-                              <p className="text-xs text-gray-500 uppercase font-bold">Ruta Frecuente Detectada</p>
-                              <p className="text-sm text-gray-200 font-medium">Principalmente Nacional / Evaluar chat</p>
+                              <p className="text-xs text-gray-500 uppercase font-bold">Ubicación y Negocio</p>
+                              <p className="text-sm text-gray-200 font-medium">{selectedLeadMeta?.company} - {selectedLeadMeta?.city}</p>
                             </div>
                           </div>
                           <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
