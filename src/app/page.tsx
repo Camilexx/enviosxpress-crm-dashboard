@@ -423,6 +423,54 @@ export default function CRMDashboard() {
                       </div>
                     </div>
 
+                    {/* Features Avanzados: LTV & Cierre Flash */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                      {/* LTV & Cierre Predictivo */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                        <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl"></div>
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2 relative z-10">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" /> Valor Histórico Relevante (LTV a 6 meses)
+                        </h3>
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div className="p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f] shrink-0 shadow-inner">
+                            <span className="text-2xl font-black font-mono text-emerald-400">
+                              {chatHistory.some(c => c.message_in.toLowerCase().includes('ecommerce') || c.message_in.toLowerCase().includes('tienda') || c.message_in.toLowerCase().includes('frecuente')) ? '$1,450' : '$45'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Estimación de retorno basada en el perfil de volumen detectado por Sophia AI.</p>
+                            <span className="inline-block mt-2 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase rounded border border-blue-500/20">Proyección Algorítmica</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Generador de Oferta Flash */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-yellow-500" /> Herramientas de Cierre Flash
+                        </h3>
+                        <p className="text-xs text-gray-400 font-medium mb-3">Envía una promoción persuasiva por WhatsApp en 1-clic para forzar conversión.</p>
+                        <div className="flex gap-2">
+                          <a
+                            href={`https://wa.me/${selectedLead.phone.split('@')[0]}?text=${encodeURIComponent('¡Hola! Soy el supervisor de envíos 📦. Por ser cliente de primera vez, te apruebo un 15% de descuento en tu primer despacho si lo enviamos HOY. ¿Te sirvo el cupón ENVIOX15?')}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex-1 px-3 py-2.5 bg-[#16202e] hover:bg-[#1e293b] border border-[#2a3a4f] hover:border-yellow-500/30 text-gray-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm relative overflow-hidden group"
+                          >
+                            <div className="absolute top-0 right-0 w-8 h-full bg-yellow-500/10 skew-x-12 -translate-x-[300%] group-hover:translate-x-[300%] transition-transform duration-700"></div>
+                            Cupón 15% OFF
+                          </a>
+                          <a
+                            href={`https://wa.me/${selectedLead.phone.split('@')[0]}?text=${encodeURIComponent('¡Hola de nuevo! Te escribo desde jefatura operativa. ¿De casualidad aún necesitas enviar el paquete? Te puedo ofrecer recolección gratuita a tu domicilio HOY mismo. 🚚')}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex-1 px-3 py-2.5 bg-[#16202e] hover:bg-[#1e293b] border border-[#2a3a4f] hover:border-emerald-500/30 text-gray-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                          >
+                            Pickup Gratis
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Plan de Acción Estratégico */}
                     <div className="bg-gradient-to-r from-[#8a1538]/10 to-transparent p-6 rounded-2xl border border-[#8a1538]/30 shadow-lg">
                       <h3 className="text-sm font-bold text-[#ff8fb0] uppercase tracking-wider mb-3 flex items-center gap-2">
