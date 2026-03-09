@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: var(--font-dm-sans), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), monospace;
+
   --color-brand-primary: #8a1538;
   /* Concho de vino logístico */
   --color-brand-hover: #b41b49;
@@ -23,7 +26,6 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
