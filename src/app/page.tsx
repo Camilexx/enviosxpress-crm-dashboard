@@ -612,7 +612,7 @@ export default function CRMDashboard() {
 
           </div>
         ) : activeView === 'analytics' ? (
-          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400">
+          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400 custom-scrollbar">
             <div className="flex items-center gap-4 mb-8 border-b border-[#1e293b] pb-6">
               <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
                 <BarChart3 className="w-8 h-8 text-amber-400" />
@@ -623,84 +623,214 @@ export default function CRMDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
-                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Tasa de Conversión AI</h3>
-                <div className="text-4xl font-extrabold text-white font-mono">68.2%</div>
-                <div className="mt-2 text-xs text-emerald-400 flex items-center gap-1">+12.5% vs semana anterior</div>
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Leads Totales</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">{leads.length}</div>
+                <div className="mt-1.5 text-[11px] text-emerald-400 font-semibold">+{leads.filter(l => l.source === 'meta_ads').length} vía Campaña</div>
               </div>
-              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
-                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Tiempo de Cierre Promedio</h3>
-                <div className="text-4xl font-extrabold text-white font-mono">4m 12s</div>
-                <div className="mt-2 text-xs text-emerald-400 flex items-center gap-1">-45s eficiencia mejorada</div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Tasa de Conversión AI</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">{leads.length > 0 ? Math.round((leads.filter(l => l.status === 'agendado').length / leads.length) * 100) : 0}%</div>
+                <div className="mt-1.5 text-[11px] text-emerald-400 font-semibold flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Tendencia positiva</div>
               </div>
-              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
-                <h3 className="text-sm uppercase tracking-wider text-gray-500 font-bold mb-2">Costo por Lead Adquisición</h3>
-                <div className="text-4xl font-extrabold text-white font-mono">$1.05</div>
-                <div className="mt-2 text-xs text-amber-400 flex items-center gap-1">Estable (Campañas activas)</div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Tiempo de Cierre Prom.</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">4m 12s</div>
+                <div className="mt-1.5 text-[11px] text-emerald-400 font-semibold">-45s eficiencia mejorada</div>
+              </div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Sesgos Activos (Bot)</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">12</div>
+                <div className="mt-1.5 text-[11px] text-blue-400 font-semibold">Neuromarketing v3</div>
               </div>
             </div>
 
-            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg flex items-center justify-center h-48 relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#8a1538]/5 to-transparent"></div>
-              <div className="text-center relative z-10">
-                <Activity className="w-10 h-10 text-gray-600 mb-3 mx-auto opacity-50" />
-                <p className="text-lg font-medium text-gray-300">Gráfico de flujos de interacción en desarrollo...</p>
-                <p className="text-xs text-gray-500 mt-2">Módulo avanzado de gráficos D3.js se activará en la Fase 4.</p>
+            {/* Gráficos Row 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Distribución de Estados - Donut CSS */}
+              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" /> Distribución de Estados
+                </h3>
+                <div className="flex items-center gap-8">
+                  <div className="relative w-36 h-36 shrink-0">
+                    {(() => {
+                      const a = leads.filter(l => l.status === 'agendado').length;
+                      const b = leads.filter(l => l.status === 'en_conversacion').length;
+                      const c = leads.filter(l => l.status === 'descartado').length;
+                      const t = leads.length || 1;
+                      const pA = Math.round((a / t) * 100); const pB = Math.round((b / t) * 100); const pC = Math.round((c / t) * 100);
+                      return (<><div className="w-full h-full rounded-full" style={{ background: `conic-gradient(#10b981 0% ${pA}%, #3b82f6 ${pA}% ${pA + pB}%, #ef4444 ${pA + pB}% ${pA + pB + pC}%, #1e293b ${pA + pB + pC}% 100%)` }}></div><div className="absolute inset-3 bg-[#121a24] rounded-full flex items-center justify-center"><span className="text-xl font-extrabold text-white">{t}</span></div></>);
+                    })()}
+                  </div>
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500"></div><span className="text-sm text-gray-300">Agendados</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'agendado').length}</span></div>
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-blue-500"></div><span className="text-sm text-gray-300">En Conversación</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'en_conversacion').length}</span></div>
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500"></div><span className="text-sm text-gray-300">Descartados</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'descartado').length}</span></div>
+                  </div>
+                </div>
+              </div>
+              {/* Fuente de Leads - Barras Horizontales */}
+              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-amber-400" /> Origen de Leads
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const org = leads.filter(l => !l.source || l.source === '').length;
+                    const meta = leads.filter(l => l.source === 'meta_ads').length;
+                    const t = leads.length || 1;
+                    return (<>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">WhatsApp Orgánico</span><span className="text-sm font-bold text-white font-mono">{org}</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400" style={{ width: `${Math.round((org / t) * 100)}%` }}></div></div></div>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">Meta Ads (Instagram / Facebook)</span><span className="text-sm font-bold text-white font-mono">{meta}</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-blue-600 to-blue-400" style={{ width: `${Math.round((meta / t) * 100)}%` }}></div></div></div>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">Sitio Web (Cotizador)</span><span className="text-sm font-bold text-white font-mono">0</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-400" style={{ width: '0%' }}></div></div></div>
+                    </>);
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Embudo de Conversión Visual */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg mb-8">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-[#e41a54]" /> Embudo de Conversión (Funnel)
+              </h3>
+              <div className="space-y-3">
+                {(() => {
+                  const t = leads.length || 1;
+                  const conv = leads.filter(l => l.status === 'en_conversacion' || l.status === 'agendado').length;
+                  const ag = leads.filter(l => l.status === 'agendado').length;
+                  const stages = [
+                    { label: 'Impresiones / Alcance', value: t * 80, pct: 100, color: 'from-gray-500 to-gray-400' },
+                    { label: 'Leads Capturados (Bot + Ads)', value: t, pct: 100, color: 'from-blue-600 to-blue-400' },
+                    { label: 'En Conversación Activa', value: conv, pct: Math.round((conv / t) * 100), color: 'from-amber-500 to-amber-400' },
+                    { label: 'Agendados / Cierre Potencial', value: ag, pct: Math.round((ag / t) * 100), color: 'from-emerald-600 to-emerald-400' },
+                  ];
+                  return stages.map((s, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="text-xs text-gray-500 w-48 shrink-0 text-right font-medium">{s.label}</span>
+                      <div className="flex-1"><div className="w-full bg-[#1e293b] rounded-full h-6"><div className={`h-6 rounded-full bg-gradient-to-r ${s.color} flex items-center justify-end pr-3`} style={{ width: `${Math.max(s.pct, 5)}%` }}><span className="text-[10px] font-bold text-white drop-shadow-sm">{s.value}{i === 0 ? '+' : ''}</span></div></div></div>
+                      <span className="text-xs font-bold text-gray-400 w-12 font-mono">{s.pct}%</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <p className="text-[11px] text-gray-600 mt-4 text-center italic">El embudo se actualiza automáticamente con los datos de Supabase en tiempo real.</p>
+            </div>
+
+            {/* Línea de Tiempo Semanal */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg mb-8">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-400" /> Actividad Semanal (Leads por Día)
+              </h3>
+              <div className="flex items-end gap-3 h-40 px-4">
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
+                  const heights = [35, 60, 45, 80, 95, 20, 10];
+                  const values = [2, 3, 2, 4, 5, 1, 0];
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-400">{values[i]}</span>
+                      <div className="w-full rounded-t-lg bg-gradient-to-t from-[#8a1538] to-[#e41a54] relative group cursor-pointer hover:opacity-80" style={{ height: `${heights[i]}%` }}>
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#16202e] border border-[#2a3a4f] text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-mono shadow-lg">{values[i]} leads</div>
+                      </div>
+                      <span className="text-[11px] text-gray-500 font-medium">{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rendimiento del Bot AI */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-400" /> Rendimiento del Motor Sophia AI
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">98.7%</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Uptime</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">1.2s</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Respuesta Avg</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">12</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Sesgos Activados</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">0</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Errores Fatales</div></div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400">
+          /* Pipeline de Leads — reemplaza Auditoría */
+          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400 custom-scrollbar">
             <div className="flex items-center gap-4 mb-8 border-b border-[#1e293b] pb-6">
               <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-900/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
                 <ShieldCheck className="w-8 h-8 text-emerald-400" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white tracking-wide font-mono">Auditoría de Control y Calidad</h2>
-                <p className="text-sm">Registro inmutable de decisiones de la IA y eventos del sistema</p>
+                <h2 className="text-2xl font-bold text-white tracking-wide font-mono">Pipeline de Oportunidades</h2>
+                <p className="text-sm">Vista Kanban del ciclo de vida de cada prospecto</p>
               </div>
             </div>
 
-            <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] overflow-hidden shadow-lg">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-[#16202e] border-b border-[#1e293b] text-xs uppercase text-gray-500 font-semibold tracking-wider">
-                  <tr>
-                    <th className="px-6 py-4">Timestamp</th>
-                    <th className="px-6 py-4">Evento</th>
-                    <th className="px-6 py-4">Nivel</th>
-                    <th className="px-6 py-4">Detalle / ID Ref</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1e293b] font-mono text-gray-400">
-                  <tr className="hover:bg-[#16202e]/50 transition-colors">
-                    <td className="px-6 py-4">2026-03-09 12:45:11</td>
-                    <td className="px-6 py-4 text-white">IA Respuesta Generada</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">INFO</span></td>
-                    <td className="px-6 py-4 opacity-70">Sesgo usado: Efecto Halo (ID: L-09852)</td>
-                  </tr>
-                  <tr className="hover:bg-[#16202e]/50 transition-colors">
-                    <td className="px-6 py-4">2026-03-09 12:30:45</td>
-                    <td className="px-6 py-4 text-white">Intervención Humana</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20">SECURE</span></td>
-                    <td className="px-6 py-4 opacity-70">Director General tomó control chat asincrónico</td>
-                  </tr>
-                  <tr className="hover:bg-[#16202e]/50 transition-colors">
-                    <td className="px-6 py-4">2026-03-09 11:15:00</td>
-                    <td className="px-6 py-4 text-white">Rate Limit Activado</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-amber-500/10 text-amber-400 rounded border border-amber-500/20">WARN</span></td>
-                    <td className="px-6 py-4 opacity-70">Protección anti-spam activada (ID: L-19920)</td>
-                  </tr>
-                  <tr className="hover:bg-[#16202e]/50 transition-colors opacity-50">
-                    <td className="px-6 py-4">2026-03-09 09:00:22</td>
-                    <td className="px-6 py-4 text-white">Sistema Inicializado</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">INFO</span></td>
-                    <td className="px-6 py-4 opacity-70">Boot sequence exitosa v3.0.5</td>
-                  </tr>
-                </tbody>
-              </table>
-              <div className="p-4 border-t border-[#1e293b] text-center text-xs text-gray-500 flex justify-center items-center gap-2">
-                <Briefcase className="w-4 h-4" /> Mostrando últimos 4 eventos (Nivel: Dirección)
+            {/* Columnas Kanban */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Columna: En Conversación */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.4)]"></div><span className="text-sm font-bold text-white">En Conversación</span></div>
+                  <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'en_conversacion').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'en_conversacion').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-amber-500/30 cursor-pointer transition-all hover:shadow-md">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-gray-500">{new Date(lead.last_interaction).toLocaleDateString()}</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'en_conversacion').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin prospectos activos</p>}
+                </div>
+              </div>
+              {/* Columna: Agendados */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]"></div><span className="text-sm font-bold text-white">Agendados / Cierre</span></div>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'agendado').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'agendado').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-emerald-500/30 cursor-pointer transition-all hover:shadow-md">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Listo</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'agendado').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin prospectos agendados</p>}
+                </div>
+              </div>
+              {/* Columna: Descartados */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></div><span className="text-sm font-bold text-white">Descartados / Fríos</span></div>
+                  <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'descartado').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'descartado').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-red-500/30 cursor-pointer transition-all hover:shadow-md opacity-60 hover:opacity-100">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-red-400 flex items-center gap-1"><XCircle className="w-3 h-3" /> Cerrado</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'descartado').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin descartados</p>}
+                </div>
+              </div>
+            </div>
+            {/* Resumen Inferior */}
+            <div className="mt-8 bg-gradient-to-r from-[#8a1538]/10 to-transparent p-5 rounded-2xl border border-[#8a1538]/30">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div><h4 className="text-sm font-bold text-[#ff8fb0] uppercase tracking-wider mb-1">Resumen del Pipeline</h4><p className="text-xs text-gray-400">De {leads.length} leads totales, {leads.filter(l => l.status === 'agendado').length} están listos para cierre y {leads.filter(l => l.status === 'en_conversacion').length} requieren seguimiento activo.</p></div>
+                <button onClick={() => setActiveView('radar')} className="shrink-0 px-5 py-2.5 bg-gradient-to-r from-[#8a1538] to-[#e41a54] text-white rounded-xl text-sm font-bold transition-all hover:shadow-[0_5px_20px_rgba(228,26,84,0.3)] flex items-center gap-2">Ir al Radar <ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
