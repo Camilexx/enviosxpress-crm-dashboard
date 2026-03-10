@@ -234,7 +234,7 @@ export default function CRMDashboard() {
           >
             {activeView === 'audit' && <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#e41a54] to-[#8a1538]"></div>}
             <ShieldCheck className={`w-5 h-5 ${activeView === 'audit' ? 'text-[#e41a54] group-hover:scale-110' : 'group-hover:text-emerald-400'} transition-all`} />
-            <span className="hidden lg:block font-medium">Auditoría Operativa</span>
+            <span className="hidden lg:block font-medium">Pipeline de Leads</span>
           </button>
         </nav>
 
