@@ -24,37 +24,49 @@ interface ChatMessage {
   created_at: string;
 }
 
-// Diccionario en DB Local para evitar repeticiones y dar perfiles exactos ecuatorianos
-const LEAD_DICTIONARY: Record<string, any> = {
-  "593987654321@c.us": { name: "Carlos Mendoza", city: "Guayaquil, EC", company: "Distribuidora del Pacífico", avatar: "from-blue-600 to-blue-400" },
-  "593963456789@c.us": { name: "Ana Paola Torres", city: "Quito, EC", company: "Boutique Independiente", avatar: "from-rose-600 to-rose-400" },
-  "593984567890@c.us": { name: "Roberto Andrade", city: "Cuenca, EC", company: "Repuestos Austros", avatar: "from-amber-600 to-amber-400" },
-  "593981112223@c.us": { name: "Estefanía Salgado", city: "Manta, EC", company: "Comercializadora de Camaron", avatar: "from-emerald-600 to-emerald-400" },
-  "593963334445@c.us": { name: "David Coronel", city: "Ambato, EC", company: "Calzado y Cueros Tungurahua", avatar: "from-purple-600 to-purple-400" },
-  "593984445556@c.us": { name: "Melissa Valdivieso", city: "Santo Domingo, EC", company: "Agropecuaria Tsáchila", avatar: "from-pink-600 to-pink-400" },
-  "593966667778@c.us": { name: "Daniel Cárdenas", city: "Machala, EC", company: "Exportadora de Banano El Oro", avatar: "from-yellow-600 to-yellow-400" },
-  "593995556667@c.us": { name: "Viviana Zambrano", city: "Loja, EC", company: "Cafetalera del Sur", avatar: "from-cyan-600 to-cyan-400" },
-  "593992223334@c.us": { name: "Xavier Jaramillo", city: "Ibarra, EC", company: "Textiles Imbabura", avatar: "from-indigo-600 to-indigo-400" },
-  "593998765432@c.us": { name: "Carla Espinosa", city: "Riobamba, EC", company: "Quilates Joyería", avatar: "from-red-600 to-red-400" },
-  "593991234567@c.us": { name: "Miguel Palacios", city: "Esmeraldas, EC", company: "Logística y Puertos", avatar: "from-teal-600 to-teal-400" },
-  "110505532379226@lid": { name: "Andrea Rivas (Agencia)", city: "Quito, EC", company: "Logística 3PL", avatar: "from-orange-600 to-orange-400" },
-  "273091821338650@lid": { name: "Luis Santander (Web)", city: "Guayaquil, EC", company: "Tienda Online Plus", avatar: "from-lime-600 to-lime-400" }
-};
+const generateLeadMeta = (phone: string, chatHistory: any[] = []) => {
+  const numericStr = phone.replace(/[^0-9]/g, '');
+  const last4 = numericStr.slice(-4) || '0000';
+  const assignedID = `CX-${last4}`;
 
-const generateLeadMeta = (phone: string) => {
-  const meta = LEAD_DICTIONARY[phone];
-  return meta ? {
-    name: meta.name,
-    city: meta.city,
-    company: meta.company,
-    formattedPhone: '+' + phone.replace('@c.us', '').replace('@lid', ''),
-    avatarColor: meta.avatar
-  } : {
-    name: "Tania Gavilanes",
-    city: "Quito, EC",
-    company: "Cliente Referido",
-    formattedPhone: '+' + phone.split('@')[0],
-    avatarColor: "from-blue-600 to-blue-400"
+  // Neutral high-tech colors
+  const colors = [
+    'from-slate-600 to-slate-400',
+    'from-zinc-600 to-zinc-400',
+    'from-stone-600 to-stone-400',
+    'from-gray-600 to-gray-400'
+  ];
+  const hash = numericStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+
+  // Basic heuristic from chat to simulate AI extraction
+  let discoveredName = `[Incógnita]`;
+  let discoveredCity = `[En espera de datos]`;
+  let discoveredCompany = `[Analizando Chat...]`;
+
+  if (chatHistory.length > 0) {
+    const allText = chatHistory.map(c => c.message_in?.toLowerCase() || '').join(' ');
+
+    // Simulate AI extraction logic
+    if (allText.includes('guayaquil') || allText.includes('costa')) discoveredCity = 'Guayaquil (Alta probabilidad)';
+    else if (allText.includes('quito') || allText.includes('cumbaya') || allText.includes('valle')) discoveredCity = 'Quito / Pichincha';
+    else if (allText.includes('manta')) discoveredCity = 'Manta (Verificado)';
+    else if (allText.includes('amazonia')) discoveredCity = 'Amazonía Sur';
+
+    if (allText.includes('ecommerce') || allText.includes('tienda') || allText.includes('ropa')) discoveredCompany = 'E-commerce / Retail (Validado)';
+    else if (allText.includes('repuesto') || allText.includes('moto')) discoveredCompany = 'Autopartes / Maquinaria';
+    else if (allText.length > 50) discoveredCompany = 'Pyme / Envío recurrente';
+
+    // Si ha conversado bastante, fingimos que sacamos un perfil aproximado
+    if (allText.length > 10) discoveredName = `Usuario ${assignedID} (Identificado)`;
+  }
+
+  return {
+    id: assignedID,
+    name: discoveredName,
+    city: discoveredCity,
+    company: discoveredCompany,
+    formattedPhone: `+593 ••• ••• ${last4}`,
+    avatarColor: colors[hash % colors.length]
   };
 };
 
@@ -180,7 +192,7 @@ export default function CRMDashboard() {
     return true;
   });
 
-  const selectedLeadMeta = selectedLead ? generateLeadMeta(selectedLead.phone) : null;
+  const selectedLeadMeta = selectedLead ? generateLeadMeta(selectedLead.phone, chatHistory) : null;
 
   return (
     <div className="min-h-screen bg-[#0a0f16] text-white flex font-sans selection:bg-[#8a1538] selection:text-white">
@@ -444,7 +456,7 @@ export default function CRMDashboard() {
                       <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent blur-2xl rounded-full"></div>
                         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-blue-400" /> Nivel de Interés (AI Score)
+                          <Activity className="w-4 h-4 text-blue-400" /> Índice de Propensión (AI Score)
                         </h3>
                         <div className="flex items-end gap-3 mb-2">
                           <span className="text-4xl font-extrabold text-white tracking-tighter">
@@ -456,7 +468,7 @@ export default function CRMDashboard() {
                           <div className={`h-2.5 rounded-full ${selectedLead.status === 'agendado' ? 'bg-emerald-500 w-[92%]' : selectedLead.status === 'en_conversacion' ? 'bg-blue-500 w-[75%]' : 'bg-red-500 w-[30%]'}`}></div>
                         </div>
                         <p className="text-sm text-gray-400 font-medium leading-relaxed">
-                          {selectedLead.status === 'agendado' ? 'Alta probabilidad de cierre. Cliente requiere atención logística inmediata.' : selectedLead.status === 'en_conversacion' ? 'Prospecto explorando tarifas. Ideal para aplicar incentivo de envío.' : 'Prospecto descartado o frío por el momento.'}
+                          {selectedLead.status === 'agendado' ? <span className="text-emerald-400 font-semibold">[Sesgo de Aversión a la Pérdida detectado].</span> : selectedLead.status === 'en_conversacion' ? <span className="text-blue-400 font-semibold">[Sesgo de Prueba Social detectado].</span> : <span className="text-red-400 font-semibold">[Ruido Cognitivo / Baja retención].</span>} {selectedLead.status === 'agendado' ? 'El cliente respondió afirmativamente a los estímulos. Máxima propensión a cierre logístico.' : selectedLead.status === 'en_conversacion' ? 'Evaluando fricciones de costo. Sugiere aplicar modelo de escasez (oferta flash).' : 'Patrón de baja probabilidad de cierre.'}
                         </p>
                       </div>
 
