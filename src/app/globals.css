@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-dm-sans), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), monospace;
+
+  --color-brand-primary: #8a1538;
+  /* Concho de vino logístico */
+  --color-brand-hover: #b41b49;
+  --color-brand-dark: #620f28;
+
+  --color-bg-dark: #0f1115;
+  --color-bg-card: #161920;
+  --color-bg-input: #1e222b;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9ca3af;
+  --color-text-accent: #f43f5e;
+}
+
+:root {
+  --background: var(--color-bg-dark);
+  --foreground: var(--color-text-primary);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}

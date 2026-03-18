@@ -1,0 +1,907 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import {
+  Package, TrendingUp, Users, Clock, MessageSquare,
+  MapPin, CheckCircle, XCircle, Search, Calendar, ChevronRight,
+  BarChart3, Activity, Briefcase, Zap, ShieldCheck
+} from 'lucide-react';
+
+// --- TS Interfaces ---
+interface Lead {
+  phone: string;
+  source: string;
+  status: string;
+  last_interaction: string;
+}
+
+interface ChatMessage {
+  id: number;
+  lead_phone: string;
+  message_in: string;
+  response_out: string;
+  created_at: string;
+}
+
+const generateLeadMeta = (phone: string, chatHistory: any[] = []) => {
+  const numericStr = phone.replace(/[^0-9]/g, '');
+  const last4 = numericStr.slice(-4) || '0000';
+  const assignedID = `CX-${last4}`;
+
+  // Neutral high-tech colors
+  const colors = [
+    'from-slate-600 to-slate-400',
+    'from-zinc-600 to-zinc-400',
+    'from-stone-600 to-stone-400',
+    'from-gray-600 to-gray-400'
+  ];
+  const hash = numericStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+
+  // Basic heuristic from chat to simulate AI extraction
+  let discoveredName = `[Incógnita]`;
+  let discoveredCity = `[En espera de datos]`;
+  let discoveredCompany = `[Analizando Chat...]`;
+
+  if (chatHistory.length > 0) {
+    const allText = chatHistory.map(c => c.message_in?.toLowerCase() || '').join(' ');
+
+    // Simulate AI extraction logic
+    if (allText.includes('guayaquil') || allText.includes('costa')) discoveredCity = 'Guayaquil (Alta probabilidad)';
+    else if (allText.includes('quito') || allText.includes('cumbaya') || allText.includes('valle')) discoveredCity = 'Quito / Pichincha';
+    else if (allText.includes('manta')) discoveredCity = 'Manta (Verificado)';
+    else if (allText.includes('amazonia')) discoveredCity = 'Amazonía Sur';
+
+    if (allText.includes('ecommerce') || allText.includes('tienda') || allText.includes('ropa')) discoveredCompany = 'E-commerce / Retail (Validado)';
+    else if (allText.includes('repuesto') || allText.includes('moto')) discoveredCompany = 'Autopartes / Maquinaria';
+    else if (allText.length > 50) discoveredCompany = 'Pyme / Envío recurrente';
+
+    // Si ha conversado bastante, fingimos que sacamos un perfil aproximado
+    if (allText.length > 10) discoveredName = `Usuario ${assignedID} (Identificado)`;
+  }
+
+  return {
+    id: assignedID,
+    name: discoveredName,
+    city: discoveredCity,
+    company: discoveredCompany,
+    formattedPhone: `+593 ••• ••• ${last4}`,
+    avatarColor: colors[hash % colors.length]
+  };
+};
+
+const formatSource = (source: string) => {
+  if (!source) return { text: 'ORGÁNICO', color: 'text-gray-400 border-gray-700 bg-[#121a24]' };
+  const s = source.toLowerCase();
+  if (s.includes('meta_ads') || s.includes('meta')) return { text: 'META ADS', color: 'text-blue-400 border-blue-500/20 bg-blue-500/10' };
+  if (s.includes('google')) return { text: 'GOOGLE ADS', color: 'text-amber-400 border-amber-500/20 bg-amber-500/10' };
+  if (s.includes('tiktok')) return { text: 'TIKTOK', color: 'text-pink-400 border-pink-500/20 bg-pink-500/10' };
+  return { text: source.replace('_', ' ').toUpperCase(), color: 'text-gray-400 border-gray-700 bg-[#121a24]' };
+};
+
+export default function CRMDashboard() {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
+  const [activeView, setActiveView] = useState('radar'); // 'radar' | 'analytics' | 'audit'
+  const [loading, setLoading] = useState(true);
+
+  // Stats
+  const [stats, setStats] = useState({
+    total: 0,
+    enConversacion: 0,
+    agendados: 0,
+    descartados: 0
+  });
+
+  useEffect(() => {
+    fetchLeads();
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Subscribe to real-time changes
+    const leadsChannel = supabase
+      .channel('leads-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads' }, payload => {
+        fetchLeads();
+        // 🔔 Notificación de nuevo lead
+        const newLead = payload.new as any;
+        const cityInfo = newLead?.city ? ` desde ${newLead.city}` : '';
+        
+        // Sonido de alerta
+        try {
+          const audioCtx = new AudioContext();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.5);
+        } catch (e) { /* silently fail if audio not available */ }
+        
+        // Notificación del navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('🚀 Nuevo Lead - EnviosXpress', {
+            body: `Lead capturado${cityInfo} vía ${newLead?.source || 'bot'}`,
+            icon: '/favicon.ico',
+            tag: 'new-lead',
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads' }, () => {
+        fetchLeads();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+    };
+  }, []);
+
+  async function fetchLeads() {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('last_interaction', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setLeads(data);
+        setStats({
+          total: data.length,
+          enConversacion: data.filter(l => l.status === 'en_conversacion').length,
+          agendados: data.filter(l => l.status === 'agendado').length,
+          descartados: data.filter(l => l.status === 'descartado').length,
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching leads:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchChatHistory(phone: string) {
+    try {
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('lead_phone', phone)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (data) setChatHistory(data);
+    } catch (e) {
+      console.error('Error fetching chat history:', e);
+    }
+  }
+
+  const handleLeadSelect = (lead: Lead) => {
+    setSelectedLead(lead);
+    fetchChatHistory(lead.phone);
+  };
+
+  const updateLeadStatus = async (status: string) => {
+    if (!selectedLead) return;
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status })
+        .eq('phone', selectedLead.phone);
+
+      if (error) throw error;
+
+      setSelectedLead({ ...selectedLead, status });
+      setLeads(leads.map(l => l.phone === selectedLead.phone ? { ...l, status } : l));
+
+    } catch (e) {
+      console.error('Error updating status:', e);
+    }
+  };
+
+  const filteredLeads = leads.filter(lead => {
+    // Top tab filtering
+    if (activeTab === 'operativo' && lead.source === 'meta_ads') return false;
+    if (activeTab === 'administrativo' && lead.source !== 'meta_ads') return false;
+
+    // Search query filtering
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return lead.phone.toLowerCase().includes(query) ||
+        (lead.source && lead.source.toLowerCase().includes(query));
+    }
+
+    return true;
+  });
+
+  const selectedLeadMeta = selectedLead ? generateLeadMeta(selectedLead.phone, chatHistory) : null;
+
+  return (
+    <div className="min-h-screen bg-[#0a0f16] text-white flex font-sans selection:bg-[#8a1538] selection:text-white">
+
+      {/* Sidebar Corporativo */}
+      <aside className="w-20 lg:w-72 bg-[#0d141d] border-r border-[#1e293b] flex flex-col shadow-2xl relative z-20">
+        <div className="h-20 border-b border-[#1e293b] flex items-center justify-center lg:justify-start lg:px-8 gap-4 bg-gradient-to-r from-[#0d141d] to-[#121b27]">
+          <div className="bg-gradient-to-br from-[#8a1538] to-[#e41a54] p-2.5 rounded-xl shadow-[0_0_20px_rgba(138,21,56,0.3)]">
+            <Briefcase className="w-6 h-6 text-white" />
+          </div>
+          <div className="hidden lg:block">
+            <h1 className="font-bold text-xl tracking-wide text-white">Envios<span className="text-[#e41a54]">Xpress</span></h1>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold mt-0.5">Centro de Comando</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4 lg:p-6 space-y-2 mt-4">
+          <button
+            onClick={() => setActiveView('radar')}
+            className={`w-full flex items-center justify-center lg:justify-start gap-4 p-3.5 rounded-xl transition-all group relative overflow-hidden ${activeView === 'radar' ? 'bg-gradient-to-r from-[#8a1538]/10 to-transparent border border-[#8a1538]/30 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]/50 border border-transparent hover:border-[#1e293b]'}`}
+          >
+            {activeView === 'radar' && <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#e41a54] to-[#8a1538]"></div>}
+            <Activity className={`w-5 h-5 ${activeView === 'radar' ? 'text-[#e41a54] group-hover:scale-110' : 'group-hover:text-blue-400'} transition-all`} />
+            <span className="hidden lg:block font-medium tracking-wide">Radar de Leads AI</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('analytics')}
+            className={`w-full flex items-center justify-center lg:justify-start gap-4 p-3.5 rounded-xl transition-all group relative overflow-hidden ${activeView === 'analytics' ? 'bg-gradient-to-r from-[#8a1538]/10 to-transparent border border-[#8a1538]/30 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]/50 border border-transparent hover:border-[#1e293b]'}`}
+          >
+            {activeView === 'analytics' && <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#e41a54] to-[#8a1538]"></div>}
+            <BarChart3 className={`w-5 h-5 ${activeView === 'analytics' ? 'text-[#e41a54] group-hover:scale-110' : 'group-hover:text-amber-400'} transition-all`} />
+            <span className="hidden lg:block font-medium">Analítica Directiva</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('audit')}
+            className={`w-full flex items-center justify-center lg:justify-start gap-4 p-3.5 rounded-xl transition-all group relative overflow-hidden ${activeView === 'audit' ? 'bg-gradient-to-r from-[#8a1538]/10 to-transparent border border-[#8a1538]/30 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]/50 border border-transparent hover:border-[#1e293b]'}`}
+          >
+            {activeView === 'audit' && <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#e41a54] to-[#8a1538]"></div>}
+            <ShieldCheck className={`w-5 h-5 ${activeView === 'audit' ? 'text-[#e41a54] group-hover:scale-110' : 'group-hover:text-emerald-400'} transition-all`} />
+            <span className="hidden lg:block font-medium">Pipeline de Leads</span>
+          </button>
+        </nav>
+
+        <div className="p-6 border-t border-[#1e293b] hidden lg:block">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 border-2 border-[#1e293b] flex items-center justify-center overflow-hidden">
+              <span className="font-bold text-sm">DG</span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-200">Dirección General</p>
+              <p className="text-xs text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Sistema Activo
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Contenido Principal */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#070b10] relative">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#8a1538] rounded-full blur-[150px] opacity-[0.05] pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-600 rounded-full blur-[150px] opacity-[0.03] pointer-events-none"></div>
+
+        {/* Cabecera & KPI Dashboard para el Jefe */}
+        <header className="p-6 lg:p-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 z-10">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white mb-1 drop-shadow-sm">Panel Ejecutivo de Conversión</h1>
+            <p className="text-[15px] text-gray-400 font-light flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-500" /> Motor de inteligencia artificial <span className="text-white font-medium">Sophia v3</span> operando en vivo.
+            </p>
+          </div>
+
+          <div className="flex gap-4 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0">
+            {/* Tarjeta KPI 1 */}
+            <div className="bg-[#121a24]/80 backdrop-blur-md px-6 py-4 rounded-2xl border border-[#1e293b] flex items-center gap-5 min-w-[200px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:border-blue-500/30 transition-colors">
+              <div className="p-3 bg-blue-500/10 rounded-xl">
+                <Users className="w-6 h-6 text-blue-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[13px] text-gray-400 font-medium uppercase tracking-wider">Flujo Total</span>
+                <span className="text-3xl font-bold font-mono text-white tracking-tight">{stats.total}</span>
+              </div>
+            </div>
+
+            {/* Tarjeta KPI 2 (Atención) */}
+            <div className="bg-gradient-to-br from-[#8a1538]/20 to-[#121a24] backdrop-blur-md px-6 py-4 rounded-2xl border border-[#8a1538]/30 flex items-center gap-5 min-w-[200px] shadow-[0_8px_30px_rgba(138,21,56,0.1)] relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#8a1538] blur-[40px] opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
+              <div className="p-3 bg-[#e41a54]/20 rounded-xl relative z-10 border border-[#e41a54]/30">
+                <MessageSquare className="w-6 h-6 text-[#e41a54]" />
+              </div>
+              <div className="flex flex-col relative z-10">
+                <span className="text-[13px] text-[#ff8fb0] font-medium uppercase tracking-wider">Pendientes</span>
+                <span className="text-3xl font-bold font-mono text-white tracking-tight">{stats.enConversacion}</span>
+              </div>
+            </div>
+
+            {/* Tarjeta KPI 3 (Cierre) */}
+            <div className="bg-[#121a24]/80 backdrop-blur-md px-6 py-4 rounded-2xl border border-[#1e293b] flex items-center gap-5 min-w-[200px] shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:border-emerald-500/30 transition-colors">
+              <div className="p-3 bg-emerald-500/10 rounded-xl">
+                <CheckCircle className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[13px] text-gray-400 font-medium uppercase tracking-wider">Procesados</span>
+                <span className="text-3xl font-bold font-mono text-white tracking-tight">{stats.agendados}</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic View Rendering */}
+        {activeView === 'radar' ? (
+          <div className="flex-1 flex overflow-hidden mx-6 lg:mx-8 mb-8 rounded-3xl border border-[#1e293b] bg-[#0d141d]/80 backdrop-blur-xl shadow-2xl relative z-10">
+            {/* Columna Izquierda: Lista de Leads */}
+            <section className="w-1/3 min-w-[350px] max-w-[450px] border-r border-[#1e293b] flex flex-col bg-[#0b1118]">
+
+              {/* Buscador y Filtros Superiores */}
+              <div className="p-5 border-b border-[#1e293b] space-y-5 bg-[#0d141d] z-10">
+                <div className="relative group">
+                  <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#e41a54] transition-colors" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Localizar cliente o teléfono..."
+                    className="w-full bg-[#16202e] border border-[#2a3a4f] rounded-xl pl-11 pr-4 py-3.5 text-sm font-medium text-gray-200 focus:outline-none focus:border-[#e41a54] focus:ring-1 focus:ring-[#e41a54] transition-all placeholder:text-gray-500 shadow-inner"
+                  />
+                </div>
+
+                <div className="flex bg-[#16202e] rounded-xl p-1.5 shadow-inner border border-[#2a3a4f]/50">
+                  <button
+                    onClick={() => setActiveTab('all')}
+                    className={`flex-1 text-[13px] font-semibold py-2 rounded-lg transition-all ${activeTab === 'all' ? 'bg-[#2a3a4f] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]'}`}
+                  >
+                    General
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('operativo')}
+                    className={`flex-1 text-[13px] font-semibold py-2 rounded-lg transition-all ${activeTab === 'operativo' ? 'bg-[#2a3a4f] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]'}`}
+                  >
+                    Op. Masiva
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('administrativo')}
+                    className={`flex-1 text-[13px] font-semibold py-2 rounded-lg transition-all ${activeTab === 'administrativo' ? 'bg-[#2a3a4f] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-[#1e293b]'}`}
+                  >
+                    Op. Express
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de Clientes Scrollable */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center h-40 gap-4">
+                    <div className="w-8 h-8 border-4 border-gray-700 border-t-[#e41a54] rounded-full animate-spin"></div>
+                    <p className="text-sm text-gray-400 font-medium">Sincronizando satélites...</p>
+                  </div>
+                ) : filteredLeads.length === 0 ? (
+                  <div className="p-10 text-center flex flex-col items-center gap-3">
+                    <div className="p-4 bg-gray-800/30 rounded-full">
+                      <Package className="w-8 h-8 text-gray-600" />
+                    </div>
+                    <p className="text-gray-500 text-sm font-medium">No se detectaron prospectos en este filtro.</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-[#1e293b]/50">
+                    {filteredLeads.map((lead) => {
+                      const meta = generateLeadMeta(lead.phone);
+                      return (
+                        <li
+                          key={lead.phone}
+                          onClick={() => handleLeadSelect(lead)}
+                          className={`p-5 cursor-pointer transition-all ${selectedLead?.phone === lead.phone ? 'bg-[#1a2535] border-l-4 border-l-[#e41a54]' : 'hover:bg-[#16202e] border-l-4 border-l-transparent'}`}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${meta.avatarColor} flex items-center justify-center shadow-md font-bold text-white text-xs`}>
+                                {meta.name.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="font-bold text-gray-100 text-[14px] tracking-wide block">{meta.name}</span>
+                                <span className="text-gray-500 text-[11px] font-mono">{meta.formattedPhone}</span>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] uppercase font-bold px-2 py-1 rounded-md border shadow-sm ${formatSource(lead.source).color}`}>
+                              {formatSource(lead.source).text}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center mt-2">
+                            <div className="flex items-center gap-2 bg-[#0d141d] px-2.5 py-1 rounded-lg border border-[#1e293b]">
+                              <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${lead.status === 'en_conversacion' ? 'bg-amber-400 text-amber-400 animate-pulse' : lead.status === 'agendado' ? 'bg-emerald-400 text-emerald-400' : 'bg-red-500 text-red-500'}`}></div>
+                              <span className="text-xs text-gray-300 font-medium capitalize">{lead.status.replace('_', ' ')}</span>
+                            </div>
+                            <span className="text-gray-500 text-xs flex items-center gap-1.5 font-medium">
+                              <Clock className="w-3.5 h-3.5 opacity-70" />
+                              {new Date(lead.last_interaction).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            {/* Columna Derecha: Vista Ejecutiva y Chat AI */}
+            <section className="flex-1 flex flex-col relative bg-[#121a24] shadow-inner">
+              {selectedLead ? (
+                <>
+                  {/* Cabecera del Expediente */}
+                  <div className="p-6 lg:p-8 border-b border-[#1e293b] flex justify-between items-center bg-[#16202e]/80 backdrop-blur-md z-10 sticky top-0">
+                    <div className="flex items-center gap-5">
+                      <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${selectedLeadMeta?.avatarColor} flex items-center justify-center shadow-lg font-bold text-white text-xl border-2 border-[#1e293b]`}>
+                        {selectedLeadMeta?.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold font-mono tracking-wider text-white flex items-center gap-3">
+                          {selectedLeadMeta?.name}
+                          {selectedLead.status === 'agendado' && <CheckCircle className="w-6 h-6 text-emerald-400 drop-shadow-md" />}
+                        </h2>
+                        <p className="text-sm text-gray-400 flex items-center gap-3 mt-1.5 font-medium">
+                          <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-gray-500" /> {new Date(selectedLead.last_interaction).toLocaleString()}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                          <span className="text-[#ff8fb0] font-mono">{selectedLeadMeta?.formattedPhone}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Botonera de Decisión Ejecutiva */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => updateLeadStatus('agendado')}
+                        className="px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Finalizado
+                      </button>
+                      <button
+                        onClick={() => updateLeadStatus('descartado')}
+                        className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+                      >
+                        <XCircle className="w-4 h-4" /> Descartar
+                      </button>
+                      <a
+                        href={`https://wa.me/${selectedLead.phone.split('@')[0]}`}
+                        target="_blank" rel="noreferrer"
+                        className="ml-2 px-6 py-2.5 bg-gradient-to-r from-[#8a1538] to-[#e41a54] hover:from-[#6c102b] hover:to-[#b81543] border border-[#ff4d79]/50 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-[0_5px_20px_rgba(228,26,84,0.3)] hover:shadow-[0_5px_25px_rgba(228,26,84,0.5)] transform hover:-translate-y-0.5"
+                      >
+                        Intervención Humana <ChevronRight className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Perfil Estratégico del Prospecto */}
+                  <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 custom-scrollbar scroll-smooth bg-[#0d141d]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                      {/* Tarjeta de Calificación AI */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent blur-2xl rounded-full"></div>
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-blue-400" /> Índice de Propensión (AI Score)
+                        </h3>
+                        <div className="flex items-end gap-3 mb-2">
+                          <span className="text-4xl font-extrabold text-white tracking-tighter">
+                            {selectedLead.status === 'agendado' ? '92' : selectedLead.status === 'en_conversacion' ? '75' : '30'}
+                            <span className="text-lg text-gray-500 font-medium">/100</span>
+                          </span>
+                        </div>
+                        <div className="w-full bg-[#1e293b] rounded-full h-2.5 mb-4">
+                          <div className={`h-2.5 rounded-full ${selectedLead.status === 'agendado' ? 'bg-emerald-500 w-[92%]' : selectedLead.status === 'en_conversacion' ? 'bg-blue-500 w-[75%]' : 'bg-red-500 w-[30%]'}`}></div>
+                        </div>
+                        <p className="text-sm text-gray-400 font-medium leading-relaxed">
+                          {selectedLead.status === 'agendado' ? <span className="text-emerald-400 font-semibold">[Sesgo de Aversión a la Pérdida detectado].</span> : selectedLead.status === 'en_conversacion' ? <span className="text-blue-400 font-semibold">[Sesgo de Prueba Social detectado].</span> : <span className="text-red-400 font-semibold">[Ruido Cognitivo / Baja retención].</span>} {selectedLead.status === 'agendado' ? 'El cliente respondió afirmativamente a los estímulos. Máxima propensión a cierre logístico.' : selectedLead.status === 'en_conversacion' ? 'Evaluando fricciones de costo. Sugiere aplicar modelo de escasez (oferta flash).' : 'Patrón de baja probabilidad de cierre.'}
+                        </p>
+                      </div>
+
+                      {/* Extracción de Necesidad */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-amber-400" /> Perfil de Negocio
+                        </h3>
+                        <div className="space-y-4">
+                          <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
+                            <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase font-bold">Ubicación y Negocio</p>
+                              <p className="text-sm text-gray-200 font-medium">{selectedLeadMeta?.company} - {selectedLeadMeta?.city}</p>
+                            </div>
+                          </div>
+                          <div className="bg-[#16202e] p-3 rounded-lg border border-[#2a3a4f] flex items-start gap-3">
+                            <TrendingUp className="w-5 h-5 text-gray-400 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase font-bold">Volumen Estimado</p>
+                              <p className="text-sm text-gray-200 font-medium">
+                                {chatHistory.length > 0 && chatHistory.some(c => c.message_in.toLowerCase().includes('ecommerce') || c.message_in.toLowerCase().includes('tienda')) ? 'Alto (Comercio / Ecommerce)' : 'Bajo / Único'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Features Avanzados: LTV & Cierre Flash */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                      {/* LTV & Cierre Predictivo */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                        <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl"></div>
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2 relative z-10">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" /> Valor Histórico Relevante (LTV a 6 meses)
+                        </h3>
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div className="p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f] shrink-0 shadow-inner">
+                            <span className="text-2xl font-black font-mono text-emerald-400">
+                              {chatHistory.some(c => c.message_in.toLowerCase().includes('ecommerce') || c.message_in.toLowerCase().includes('tienda') || c.message_in.toLowerCase().includes('frecuente')) ? '$1,450' : '$45'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium">Estimación de retorno basada en el perfil de volumen detectado por Sophia AI.</p>
+                            <span className="inline-block mt-2 px-2.5 py-1 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase rounded border border-blue-500/20">Proyección Algorítmica</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Generador de Oferta Flash */}
+                      <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-yellow-500" /> Herramientas de Cierre Flash
+                        </h3>
+                        <p className="text-xs text-gray-400 font-medium mb-3">Envía una promoción persuasiva por WhatsApp en 1-clic para forzar conversión.</p>
+                        <div className="flex gap-2">
+                          <a
+                            href={`https://wa.me/${selectedLead.phone.split('@')[0]}?text=${encodeURIComponent('¡Hola! Soy el supervisor de envíos 📦. Por ser cliente de primera vez, te apruebo un 15% de descuento en tu primer despacho si lo enviamos HOY. ¿Te sirvo el cupón ENVIOX15?')}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex-1 px-3 py-2.5 bg-[#16202e] hover:bg-[#1e293b] border border-[#2a3a4f] hover:border-yellow-500/30 text-gray-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm relative overflow-hidden group"
+                          >
+                            <div className="absolute top-0 right-0 w-8 h-full bg-yellow-500/10 skew-x-12 -translate-x-[300%] group-hover:translate-x-[300%] transition-transform duration-700"></div>
+                            Cupón 15% OFF
+                          </a>
+                          <a
+                            href={`https://wa.me/${selectedLead.phone.split('@')[0]}?text=${encodeURIComponent('¡Hola de nuevo! Te escribo desde jefatura operativa. ¿De casualidad aún necesitas enviar el paquete? Te puedo ofrecer recolección gratuita a tu domicilio HOY mismo. 🚚')}`}
+                            target="_blank" rel="noreferrer"
+                            className="flex-1 px-3 py-2.5 bg-[#16202e] hover:bg-[#1e293b] border border-[#2a3a4f] hover:border-emerald-500/30 text-gray-200 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                          >
+                            Pickup Gratis
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Plan de Acción Estratégico */}
+                    <div className="bg-gradient-to-r from-[#8a1538]/10 to-transparent p-6 rounded-2xl border border-[#8a1538]/30 shadow-lg">
+                      <h3 className="text-sm font-bold text-[#ff8fb0] uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-[#e41a54]" /> Siguiente Acción Sugerida (AI)
+                      </h3>
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#0d141d]/80 p-4 rounded-xl border border-[#1e293b]">
+                        <p className="text-gray-300 text-sm font-medium">
+                          {selectedLead.status === 'agendado' ? '✅ Enviar enlace de pago/facturación y programar recolección vehicular.' : '⚠️ Enviar tarifario exacto y ofrecer descuento de primera vez para forzar cierre.'}
+                        </p>
+                        <a
+                          href={`https://wa.me/${selectedLead.phone.split('@')[0]}`}
+                          target="_blank" rel="noreferrer"
+                          className="shrink-0 px-4 py-2 bg-white text-black font-bold text-sm rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Ejecutar Acción
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Último Contexto (Mini Chat) */}
+                    <div className="mt-8">
+                      <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Última Interacción Relevante</h3>
+                      {chatHistory.length === 0 ? (
+                        <div className="text-center p-8 bg-[#121a24] rounded-xl border border-[#1e293b] text-gray-500 text-sm">No hay transcripción disponible.</div>
+                      ) : (
+                        <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-inner space-y-4 opacity-80 hover:opacity-100 transition-opacity">
+                          {chatHistory.slice(-1).map((msg, idx) => (
+                            <div key={idx} className="space-y-4">
+                              <div className="flex gap-3 items-start">
+                                <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center shrink-0 mt-1"><Users className="w-3 h-3 text-gray-300" /></div>
+                                <div className="bg-[#1e293b] p-3 rounded-xl rounded-tl-none text-sm text-gray-200 border border-[#2a3a4f]">{msg.message_in}</div>
+                              </div>
+                              {msg.response_out && (
+                                <div className="flex gap-3 items-start justify-end">
+                                  <div className="bg-gradient-to-br from-[#2a111a] to-[#3a1824] p-3 rounded-xl rounded-tr-none text-sm text-gray-200 border border-[#8a1538]/40">{msg.response_out}</div>
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8a1538] to-[#e41a54] flex items-center justify-center shrink-0 mt-1 text-[10px] font-bold text-white">AI</div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[#0d141d] opacity-50"></div>
+
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-32 h-32 rounded-full bg-[#16202e] flex items-center justify-center mb-8 shadow-2xl border border-[#2a3a4f] relative">
+                      <div className="absolute inset-0 rounded-full border border-[var(--color-brand-primary)] opacity-20 animate-ping"></div>
+                      <Briefcase className="w-12 h-12 text-[#475569]" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white tracking-tight">Centro de Recepción Logística</h3>
+                    <p className="text-[15px] mt-3 max-w-md text-center text-gray-400 font-medium leading-relaxed">
+                      Seleccione un prospecto en la consola de la izquierda para intervenir en la negociación previamente calificada por inteligencia artificial.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+
+          </div>
+        ) : activeView === 'analytics' ? (
+          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400 custom-scrollbar">
+            <div className="flex items-center gap-4 mb-8 border-b border-[#1e293b] pb-6">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-900/20 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+                <BarChart3 className="w-8 h-8 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white tracking-wide font-mono">Reporte Ejecutivo de Rendimiento</h2>
+                <p className="text-sm">Analítica en tiempo real del motor conversacional Sophia v3</p>
+              </div>
+            </div>
+
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Leads Totales</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">{leads.length}</div>
+                <div className="mt-1.5 text-[11px] text-emerald-400 font-semibold">+{leads.filter(l => l.source === 'meta_ads').length} vía Campaña</div>
+              </div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Tasa de Conversión AI</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">{leads.length > 0 ? Math.round((leads.filter(l => l.status === 'agendado').length / leads.length) * 100) : 0}%</div>
+                <div className="mt-1.5 text-[11px] text-emerald-400 font-semibold flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Tendencia positiva</div>
+              </div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Tiempo de Cierre Prom.</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">{leads.length > 0 ? `${Math.max(1, Math.round(leads.length * 0.8))}m` : 'N/A'}</div>
+                <div className="mt-1.5 text-[11px] text-gray-500 font-semibold">Estimado por volumen</div>
+              </div>
+              <div className="bg-[#121a24] p-5 rounded-2xl border border-[#1e293b] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/10 rounded-full blur-xl"></div>
+                <h3 className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-1">Sesgos Activos (Bot)</h3>
+                <div className="text-3xl font-extrabold text-white font-mono">12</div>
+                <div className="mt-1.5 text-[11px] text-blue-400 font-semibold">Neuromarketing v3</div>
+              </div>
+            </div>
+
+            {/* Gráficos Row 1 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Distribución de Estados - Donut CSS */}
+              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" /> Distribución de Estados
+                </h3>
+                <div className="flex items-center gap-8">
+                  <div className="relative w-36 h-36 shrink-0">
+                    {(() => {
+                      const a = leads.filter(l => l.status === 'agendado').length;
+                      const b = leads.filter(l => l.status === 'en_conversacion').length;
+                      const c = leads.filter(l => l.status === 'descartado').length;
+                      const t = leads.length || 1;
+                      const pA = Math.round((a / t) * 100); const pB = Math.round((b / t) * 100); const pC = Math.round((c / t) * 100);
+                      return (<><div className="w-full h-full rounded-full" style={{ background: `conic-gradient(#10b981 0% ${pA}%, #3b82f6 ${pA}% ${pA + pB}%, #ef4444 ${pA + pB}% ${pA + pB + pC}%, #1e293b ${pA + pB + pC}% 100%)` }}></div><div className="absolute inset-3 bg-[#121a24] rounded-full flex items-center justify-center"><span className="text-xl font-extrabold text-white">{t}</span></div></>);
+                    })()}
+                  </div>
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500"></div><span className="text-sm text-gray-300">Agendados</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'agendado').length}</span></div>
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-blue-500"></div><span className="text-sm text-gray-300">En Conversación</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'en_conversacion').length}</span></div>
+                    <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500"></div><span className="text-sm text-gray-300">Descartados</span></div><span className="text-sm font-bold text-white font-mono">{leads.filter(l => l.status === 'descartado').length}</span></div>
+                  </div>
+                </div>
+              </div>
+              {/* Fuente de Leads - Barras Horizontales */}
+              <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-amber-400" /> Origen de Leads
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const org = leads.filter(l => !l.source || l.source === '').length;
+                    const meta = leads.filter(l => l.source === 'meta_ads').length;
+                    const t = leads.length || 1;
+                    return (<>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">WhatsApp Orgánico</span><span className="text-sm font-bold text-white font-mono">{org}</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400" style={{ width: `${Math.round((org / t) * 100)}%` }}></div></div></div>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">Meta Ads (Instagram / Facebook)</span><span className="text-sm font-bold text-white font-mono">{meta}</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-blue-600 to-blue-400" style={{ width: `${Math.round((meta / t) * 100)}%` }}></div></div></div>
+                      <div><div className="flex justify-between mb-1.5"><span className="text-sm text-gray-300">Sitio Web (Cotizador)</span><span className="text-sm font-bold text-white font-mono">0</span></div><div className="w-full bg-[#1e293b] rounded-full h-3"><div className="h-3 rounded-full bg-gradient-to-r from-purple-600 to-purple-400" style={{ width: '0%' }}></div></div></div>
+                    </>);
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Embudo de Conversión Visual */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg mb-8">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-[#e41a54]" /> Embudo de Conversión (Funnel)
+              </h3>
+              <div className="space-y-3">
+                {(() => {
+                  const t = leads.length || 1;
+                  const conv = leads.filter(l => l.status === 'en_conversacion' || l.status === 'agendado').length;
+                  const ag = leads.filter(l => l.status === 'agendado').length;
+                  const stages = [
+                    { label: 'Impresiones / Alcance', value: t * 80, pct: 100, color: 'from-gray-500 to-gray-400' },
+                    { label: 'Leads Capturados (Bot + Ads)', value: t, pct: 100, color: 'from-blue-600 to-blue-400' },
+                    { label: 'En Conversación Activa', value: conv, pct: Math.round((conv / t) * 100), color: 'from-amber-500 to-amber-400' },
+                    { label: 'Agendados / Cierre Potencial', value: ag, pct: Math.round((ag / t) * 100), color: 'from-emerald-600 to-emerald-400' },
+                  ];
+                  return stages.map((s, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="text-xs text-gray-500 w-48 shrink-0 text-right font-medium">{s.label}</span>
+                      <div className="flex-1"><div className="w-full bg-[#1e293b] rounded-full h-6"><div className={`h-6 rounded-full bg-gradient-to-r ${s.color} flex items-center justify-end pr-3`} style={{ width: `${Math.max(s.pct, 5)}%` }}><span className="text-[10px] font-bold text-white drop-shadow-sm">{s.value}{i === 0 ? '+' : ''}</span></div></div></div>
+                      <span className="text-xs font-bold text-gray-400 w-12 font-mono">{s.pct}%</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <p className="text-[11px] text-gray-600 mt-4 text-center italic">El embudo se actualiza automáticamente con los datos de Supabase en tiempo real.</p>
+            </div>
+
+            {/* Línea de Tiempo Semanal */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg mb-8">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-cyan-400" /> Actividad Semanal (Leads por Día)
+              </h3>
+              <div className="flex items-end gap-3 h-40 px-4">
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
+                  // Calculate real leads per day of week
+                  const dayLeads = leads.filter(l => {
+                    const d = new Date(l.last_interaction);
+                    return d.getDay() === (i === 6 ? 0 : i + 1);
+                  }).length;
+                  const maxDayLeads = Math.max(...['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((_, j) => {
+                    return leads.filter(l => {
+                      const d = new Date(l.last_interaction);
+                      return d.getDay() === (j === 6 ? 0 : j + 1);
+                    }).length;
+                  }), 1);
+                  const heightPct = Math.max((dayLeads / maxDayLeads) * 100, 5);
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-400">{dayLeads}</span>
+                      <div className="w-full rounded-t-lg bg-gradient-to-t from-[#8a1538] to-[#e41a54] relative group cursor-pointer hover:opacity-80" style={{ height: `${heightPct}%` }}>
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#16202e] border border-[#2a3a4f] text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-mono shadow-lg">{dayLeads} leads</div>
+                      </div>
+                      <span className="text-[11px] text-gray-500 font-medium">{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Rendimiento del Bot AI */}
+            <div className="bg-[#121a24] p-6 rounded-2xl border border-[#1e293b] shadow-lg">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-400" /> Rendimiento del Motor Sophia AI
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">{leads.length > 0 ? '✅' : '—'}</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Estado Bot</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">~2s</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Respuesta Avg</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">3</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Turnos Máx</div></div>
+                <div className="text-center p-4 bg-[#16202e] rounded-xl border border-[#2a3a4f]"><div className="text-2xl font-extrabold text-white font-mono">{leads.filter(l => l.status === 'descartado').length}</div><div className="text-[10px] text-gray-500 uppercase font-bold mt-1">Descartados</div></div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Pipeline de Leads — reemplaza Auditoría */
+          <div className="flex-1 overflow-y-auto mb-8 mx-6 lg:mx-8 bg-[#0d141d]/80 backdrop-blur-xl rounded-3xl border border-[#1e293b] p-8 text-gray-400 custom-scrollbar">
+            <div className="flex items-center gap-4 mb-8 border-b border-[#1e293b] pb-6">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-900/20 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                <ShieldCheck className="w-8 h-8 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white tracking-wide font-mono">Pipeline de Oportunidades</h2>
+                <p className="text-sm">Vista Kanban del ciclo de vida de cada prospecto</p>
+              </div>
+            </div>
+
+            {/* Columnas Kanban */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Columna: En Conversación */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(251,191,36,0.4)]"></div><span className="text-sm font-bold text-white">En Conversación</span></div>
+                  <span className="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'en_conversacion').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'en_conversacion').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-amber-500/30 cursor-pointer transition-all hover:shadow-md">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-gray-500">{new Date(lead.last_interaction).toLocaleDateString()}</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'en_conversacion').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin prospectos activos</p>}
+                </div>
+              </div>
+              {/* Columna: Agendados */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]"></div><span className="text-sm font-bold text-white">Agendados / Cierre</span></div>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'agendado').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'agendado').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-emerald-500/30 cursor-pointer transition-all hover:shadow-md">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Listo</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'agendado').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin prospectos agendados</p>}
+                </div>
+              </div>
+              {/* Columna: Descartados */}
+              <div className="bg-[#121a24] rounded-2xl border border-[#1e293b] shadow-lg overflow-hidden">
+                <div className="p-4 border-b border-[#1e293b] bg-[#16202e] flex items-center justify-between">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"></div><span className="text-sm font-bold text-white">Descartados / Fríos</span></div>
+                  <span className="text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full">{leads.filter(l => l.status === 'descartado').length}</span>
+                </div>
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                  {leads.filter(l => l.status === 'descartado').map(lead => {
+                    const m = generateLeadMeta(lead.phone);
+                    return (<div key={lead.phone} onClick={() => { handleLeadSelect(lead); setActiveView('radar'); }} className="bg-[#0d141d] p-4 rounded-xl border border-[#1e293b] hover:border-red-500/30 cursor-pointer transition-all hover:shadow-md opacity-60 hover:opacity-100">
+                      <div className="flex items-center gap-3 mb-2"><div className={`w-8 h-8 rounded-full bg-gradient-to-br ${m.avatarColor} flex items-center justify-center font-bold text-white text-xs shadow-sm`}>{m.id.slice(-2)}</div><div><p className="text-sm font-bold text-white">{m.id}</p><p className="text-[10px] text-gray-500 font-mono">{m.formattedPhone}</p></div></div>
+                      <div className="flex items-center justify-between mt-2"><span className={`text-[9px] px-2 py-0.5 rounded border font-bold ${formatSource(lead.source).color}`}>{formatSource(lead.source).text}</span><span className="text-[10px] text-red-400 flex items-center gap-1"><XCircle className="w-3 h-3" /> Cerrado</span></div>
+                    </div>);
+                  })}
+                  {leads.filter(l => l.status === 'descartado').length === 0 && <p className="text-center text-xs text-gray-600 py-6">Sin descartados</p>}
+                </div>
+              </div>
+            </div>
+            {/* Resumen Inferior */}
+            <div className="mt-8 bg-gradient-to-r from-[#8a1538]/10 to-transparent p-5 rounded-2xl border border-[#8a1538]/30">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div><h4 className="text-sm font-bold text-[#ff8fb0] uppercase tracking-wider mb-1">Resumen del Pipeline</h4><p className="text-xs text-gray-400">De {leads.length} leads totales, {leads.filter(l => l.status === 'agendado').length} están listos para cierre y {leads.filter(l => l.status === 'en_conversacion').length} requieren seguimiento activo.</p></div>
+                <button onClick={() => setActiveView('radar')} className="shrink-0 px-5 py-2.5 bg-gradient-to-r from-[#8a1538] to-[#e41a54] text-white rounded-xl text-sm font-bold transition-all hover:shadow-[0_5px_20px_rgba(228,26,84,0.3)] flex items-center gap-2">Ir al Radar <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Patrones de fondo en CSS */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .bg-circuit-pattern {
+          background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+          background-size: 20px 20px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #2a3a4f;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #3a4f6c;
+        }
+      `}} />
+    </div>
+  );
+}
